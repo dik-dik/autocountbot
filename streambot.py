@@ -72,7 +72,10 @@ class StdOutListener(tweepy.StreamListener):
         
         url = "https://twitter.com/"+status.user.screen_name+"/status/"+str(status.id)
         
-        head, sep, tail = status.text.partition('http')
+        if status.truncated:
+            head, sep, tail = status.extended_tweet['full_text'].partition('http')
+        else:
+            head = status.text
         
         response = "*@"+status.user.screen_name+" tweet!* "+url
         vpresponse = "*@"+status.user.screen_name+" tweet!* "+head
@@ -95,9 +98,8 @@ class StdOutListener(tweepy.StreamListener):
                 post_message(channel1, response)
         if status.user.screen_name == 'predickit':
             post_message(testchannel, vpresponse)
-            
-        print response        
         
+        print response       
         
     def on_error(self, status):
         print status
