@@ -72,8 +72,10 @@ class StdOutListener(tweepy.StreamListener):
         
         url = "https://twitter.com/"+status.user.screen_name+"/status/"+str(status.id)
         
+        head, sep, tail = status.text.partition('http')
+        
         response = "*@"+status.user.screen_name+" tweet!* "+url
-        vpresponse = "*@"+status.user.screen_name+" tweet!*"        
+        vpresponse = "*@"+status.user.screen_name+" tweet!* "+head
         #reload the data
         load_data()
         
@@ -88,11 +90,11 @@ class StdOutListener(tweepy.StreamListener):
         if status.user.screen_name != 'predickit':
             post_message(channel2, response)
             if status.user.screen_name == 'VP':
-                post_message(channel1, response)
+                post_message(channel1, vpresponse)
             else:
                 post_message(channel1, response)
         if status.user.screen_name == 'predickit':
-            post_message(testchannel, response)
+            post_message(testchannel, vpresponse)
             
         print response        
         
