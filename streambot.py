@@ -4,6 +4,7 @@ import urllib
 from slackclient import SlackClient
 from datetime import datetime
 from datetime import timedelta
+from collections import OrderedDict
 
 #load secrets
 f = json.load(open('secrets.json', 'r'))
@@ -25,6 +26,8 @@ AT_BOT = "<@" + BOT_ID + ">"
 slack_client = SlackClient(slack_token)
 BOT_NAME = 'autocountbot'
 
+countresponse = ""
+
 
 def get_since_last():
     global last_update_time
@@ -41,15 +44,15 @@ def load_data():
     global last_update_time
     global since_last
     print "Loading the data from realcount.club ...."
-    url = 'http://realcount.club/data.json'
+    url = 'http://realcount.club/alldata.json'
     lithium_urllib = urllib.urlopen(url)
     lithium_data = json.loads(lithium_urllib.read())
+    lithium_data = OrderedDict(sorted(lithium_data.items(), key=lambda t: t[0].lower()))
     last_update_time = datetime.now()
     get_since_last()
 
 def reload_data():
     print "Checking for last update ...."
-    global since_last
     get_since_last()
     
     if since_last > timedelta(hours=1):
@@ -59,22 +62,23 @@ def reload_data():
 
 def get_counts():
     global countresponse
+    countresponse = ""
     global lithium_data
+    global tweet
+    tweet = {}
     print "Updating counts ...."
     reload_data()
     
     # call twitter api for each
-    potus = api.get_user('potus')
-    rdt = api.get_user('realDonaldTrump')
-    vp = api.get_user('vp')
     
-    lithium_data['potuscount'] = potus.statuses_count - lithium_data['potusnum']
-    lithium_data['rdtcount'] = rdt.statuses_count - lithium_data['rdtnum']
-    lithium_data['vpcount'] = vp.statuses_count - lithium_data['vpnum']
-    
-    countresponse = "<" + lithium_data['potuslink'] + "|*POTUS*> " + str(lithium_data['potuscount']) + "       <" + lithium_data['rdtlink'] + "|*RDT*> " + str(lithium_data['rdtcount']) + "       <" + lithium_data['vplink'] + "|*VP*> " + str(lithium_data['vpcount']) + "       <http://realcount.club/|more>"
-
-    print "POTUS: "+str(lithium_data['potuscount'])+"     RDT: "+str(lithium_data['rdtcount'])+"     VP:"+str(lithium_data['vpcount'])
+    for key in lithium_data:        
+        tweet[lithium_data[key]['handle']]=api.get_user(lithium_data[key]['handle'])
+        lithium_data[key]['count'] = tweet[lithium_data[key]['handle']].statuses_count - lithium_data[key]['num']
+        countresponse += "<" + lithium_data[key]['link'] + "|*" + key + "*> " + str(lithium_data[key]['count']) + "        "
+        
+    countresponse += "<http://realcount.club/|more>"
+    countresponse = countresponse.replace("realDonaldTrump", "RDT")
+    print countresponse
 
 def post_message(channel, response, username=None, pic=None):
     if username is None:
@@ -83,15 +87,15 @@ def post_message(channel, response, username=None, pic=None):
         slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=False, username=username, icon_url=pic, unfurl_media=True)
     # print(response)
 
-handles = {818910970567344128: 'VP', 25073877: 'realDonaldTrump', 822215679726100480: 'POTUS', 836598396165230594: 'predickit'}
+handles = {818910970567344128: 'VP1', 25073877: 'realDonaldTrump', 822215679726100480: 'POTUS', 836598396165230594: 'predickit'}
 
 # This is the listener, resposible for receiving data
 class StdOutListener(tweepy.StreamListener):
             
     def on_delete(self, status_id, user_id):
-        url = "https://twitter.com/" + handles[user_id] + str(status_id)
+        url = "https://twitter.com/" + handles[user_id] + "/" + str(status_id)
         response = handles[user_id] + " DELETION!!!"
-        channel = "#alert"
+        channel = "#twitteralert"
         
         if user_id == 836598396165230594:
             print url
@@ -111,6 +115,8 @@ class StdOutListener(tweepy.StreamListener):
         return
     
     def on_status(self, status):
+        #print status
+        
         channel1 = "#general"
         channel2 = "#twitteralert"
         testchannel = "#test"
@@ -119,8 +125,12 @@ class StdOutListener(tweepy.StreamListener):
         
         if status.truncated:
             vpresponse, sep, tail = status.extended_tweet['full_text'].partition('http')
+            #source = status.extended_tweet['source']
         else:
             vpresponse, sep, tail = status.text.partition('http')
+            #source = status.source
+        
+        #sourceresponse = "\nSource: "+source
         
         #response = "*@"+status.user.screen_name+" tweet!* "+url
         #vpresponse = "*@"+status.user.screen_name+" tweet!* "+head
@@ -128,8 +138,8 @@ class StdOutListener(tweepy.StreamListener):
         get_counts()
         
         at_name = "@" + status.user.screen_name+ " tweet!"
-        response = url + "\n" + countresponse
-        vpresponse = vpresponse + "\n" + countresponse
+        response = url + "\n" + countresponse# + sourceresponse
+        vpresponse = vpresponse + "\n" + countresponse# + sourceresponse
         
         if status.user.screen_name != 'predickit':
             post_message(channel2, response, at_name, status.user.profile_image_url)
@@ -150,9 +160,8 @@ class StdOutListener(tweepy.StreamListener):
 if __name__ == '__main__':
     load_data()
     get_counts()
-    response = "<" + lithium_data['potuslink'] + "|*POTUS*> " + str(lithium_data['potuscount']) + "       <" + lithium_data['rdtlink'] + "|*RDT*> " + str(lithium_data['rdtcount']) + "       <" + lithium_data['vplink'] + "|*VP*> " + str(lithium_data['vpcount']) + "       <http://realcount.club/|more>"
-    post_message("#test", "Loading up streambot")
-    post_message("#test", response)
+    post_message("#test", "Loading up streambot...")
+    post_message("#test", countresponse)
     print "Showing all tweets from my timeline"
     while True:
         l = StdOutListener()
