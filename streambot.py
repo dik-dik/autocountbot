@@ -76,80 +76,132 @@ def get_counts():
         lithium_data[key]['count'] = tweet[lithium_data[key]['handle']].statuses_count - lithium_data[key]['num']
         countresponse += "<" + lithium_data[key]['link'] + "|*" + key + "*> " + str(lithium_data[key]['count']) + "        "
         
-    countresponse += "<http://realcount.club/|more>"
     countresponse = countresponse.replace("realDonaldTrump", "RDT")
+    countresponse += "<http://realcount.club/|more>"
     print countresponse
 
 def post_message(channel, response, username=None, pic=None):
     if username is None:
         slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=True)
     else:
-        slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=False, username=username, icon_url=pic, unfurl_media=True)
+        slack_client.api_call("chat.postMessage", channel=channel, text=response, as_user=False, username=username, icon_url=pic)
     # print(response)
 
-handles = {818910970567344128: 'VP1', 25073877: 'realDonaldTrump', 822215679726100480: 'POTUS', 836598396165230594: 'predickit'}
+handles = {818910970567344128: 'VP', 25073877: 'realDonaldTrump', 822215679726100480: 'POTUS', 836598396165230594: 'predickit'}
 
 # This is the listener, resposible for receiving data
 class StdOutListener(tweepy.StreamListener):
             
     def on_delete(self, status_id, user_id):
+        global countresponse
+        global lithium_data
         url = "https://twitter.com/" + handles[user_id] + "/" + str(status_id)
         response = handles[user_id] + " DELETION!!!"
-        channel = "#twitteralert"
+        alertchannel = "#twitteralert"
+        generalchannel = "#general"
         
         if user_id == 836598396165230594:
             print url
-            channel = "#test"
+            alertchannel = "#test"
+            generalchannel = "#test"
             
-        post_message(channel,response)
+        post_message(alertchannel,response)
         print response
-        get_counts()
-        post_message(channel,countresponse)
         
-        channel = "#general"
+        quickcount = ""
+        
+        if handles[user_id] == "VP":
+            lithium_data["VP1"]['count'] -=1
+            lithium_data["VP2"]['count'] -=1
+        elif handles[user_id] == "POTUS":
+            lithium_data["POTUS"]['count'] -=1
+        elif handles[user_id] == "realDonaldTrump":
+            lithium_data["realDonaldTrump"]['count'] -=1
+        
+        for key in lithium_data:
+            quickcount += "<" + lithium_data[key]['link'] + "|*" + key + "*> " + str(lithium_data[key]['count']) + "        "
+        
+        quickcount = quickcount.replace("realDonaldTrump", "RDT")
+        quickcount += "<http://realcount.club/|more>"
+        
+        post_message(generalchannel,quickcount)
+        
+        get_counts()
+        
+        if quickcount != countresponse:
+            post_message("#general","Count correction!\n"+countresponse)
+        
         if user_id == 836598396165230594:
-            channel = "#test"
+            generalchannel = "#test"
             
-        post_message(channel,response+"\n"+countresponse+"\nDeleted tweet: "+url)
+        post_message(generalchannel,response+"\n"+countresponse+"\nDeleted tweet: "+url)
         
         return
     
     def on_status(self, status):
+        global countresponse
+        global lithium_data
         #print status
         
-        channel1 = "#general"
-        channel2 = "#twitteralert"
+        generalchannel = "#general"
+        alertchannel = "#twitteralert"
         testchannel = "#test"
         
-        url = "https://twitter.com/"+status.user.screen_name+"/status/"+str(status.id)
-        
-        if status.truncated:
-            vpresponse, sep, tail = status.extended_tweet['full_text'].partition('http')
-            #source = status.extended_tweet['source']
-        else:
-            vpresponse, sep, tail = status.text.partition('http')
-            #source = status.source
-        
-        #sourceresponse = "\nSource: "+source
-        
-        #response = "*@"+status.user.screen_name+" tweet!* "+url
-        #vpresponse = "*@"+status.user.screen_name+" tweet!* "+head
-        #get the current counts
-        get_counts()
-        
         at_name = "@" + status.user.screen_name+ " tweet!"
-        response = url + "\n" + countresponse# + sourceresponse
-        vpresponse = vpresponse + "\n" + countresponse# + sourceresponse
+        
+        url = "https://twitter.com/"+status.user.screen_name+"/status/"+str(status.id)
+        response = url
         
         if status.user.screen_name != 'predickit':
-            post_message(channel2, response, at_name, status.user.profile_image_url)
-            if status.user.screen_name == 'VP':
-                post_message(channel1, vpresponse, at_name, status.user.profile_image_url)
-            else:
-                post_message(channel1, response, at_name, status.user.profile_image_url)
-        if status.user.screen_name == 'predickit':
+            # if status.user.screen_name == 'VP':
+            #     if status.truncated:
+            #         response, sep, tail = status.extended_tweet['full_text'].partition('http')
+            #     else:
+            #         response, sep, tail = status.text.partition('http')
+            post_message(generalchannel, response, at_name, status.user.profile_image_url)
+        else:
             post_message(testchannel, response, at_name, status.user.profile_image_url)
         
+        quickcount = ""
+        
+        if status.user.screen_name == "VP":
+            lithium_data["VP1"]['count'] +=1
+            lithium_data["VP2"]['count'] +=1
+        elif status.user.screen_name == "POTUS":
+            lithium_data["POTUS"]['count'] +=1
+        elif status.user.screen_name == "realDonaldTrump":
+            lithium_data["realDonaldTrump"]['count'] +=1
+            
+        
+        for key in lithium_data:
+            quickcount += "<" + lithium_data[key]['link'] + "|*" + key + "*> " + str(lithium_data[key]['count']) + "        "
+        
+        quickcount = quickcount.replace("realDonaldTrump", "RDT")
+        quickcount += "<http://realcount.club/|more>"
+        print quickcount
+        
+        if status.user.screen_name != 'predickit':
+            post_message(generalchannel, quickcount, at_name, status.user.profile_image_url)
+            get_counts()
+            if quickcount != countresponse:
+                post_message(generalchannel, "Count correction!\n"+countresponse, at_name, status.user.profile_image_url)
+            alertresponse = url + "\n" + countresponse
+            post_message(alertchannel, alertresponse, at_name, status.user.profile_image_url)
+        else:
+            post_message(testchannel, quickcount, at_name, status.user.profile_image_url)
+            get_counts()
+            if quickcount != countresponse:
+                post_message(testchannel, "Count correction!\n"+countresponse, at_name, status.user.profile_image_url)
+            
+        # if status.user.screen_name != 'predickit':
+        #     post_message(alertchannel, countresponse, at_name, status.user.profile_image_url)
+        #     if status.user.screen_name == 'VP':
+        #         post_message(generalchannel, vpresponse, at_name, status.user.profile_image_url)
+        #     else:
+        #         post_message(generalchannel, response, at_name, status.user.profile_image_url)
+        # if status.user.screen_name == 'predickit':
+        #     post_message(testchannel, response, at_name, status.user.profile_image_url)
+        #
         print at_name
         #print response  
         
