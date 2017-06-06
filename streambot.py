@@ -55,7 +55,7 @@ def reload_data():
     print "Checking for last update ...."
     get_since_last()
     
-    if since_last > timedelta(hours=1):
+    if since_last > timedelta(minutes=10):
         load_data()
     else:
         print "Too soon to update from realcount.club again."
@@ -105,14 +105,14 @@ class StdOutListener(tweepy.StreamListener):
             alertchannel = "#test"
             generalchannel = "#test"
             
-        post_message(alertchannel,response)
+        post_message(generalchannel,response)
         print response
         
         quickcount = ""
         
         if handles[user_id] == "VP":
-            lithium_data["VP1"]['count'] -=1
-            lithium_data["VP2"]['count'] -=1
+            lithium_data["VP-Fri"]['count'] -=1
+            lithium_data["VP-Tue"]['count'] -=1
         elif handles[user_id] == "POTUS":
             lithium_data["POTUS"]['count'] -=1
         elif handles[user_id] == "realDonaldTrump":
@@ -126,15 +126,15 @@ class StdOutListener(tweepy.StreamListener):
         
         post_message(generalchannel,quickcount)
         
+        time.sleep(5)
         get_counts()
         
         if quickcount != countresponse:
             post_message("#general","Count correction!\n"+countresponse)
-        
-        if user_id == 836598396165230594:
-            generalchannel = "#test"
             
-        post_message(generalchannel,response+"\n"+countresponse+"\nDeleted tweet: "+url)
+        post_message(alertchannel,response+"\n"+countresponse+"\nDeleted tweet: "+url)
+            
+        post_message(generalchannel,"Deleted tweet: "+url)
         
         return
     
@@ -153,11 +153,11 @@ class StdOutListener(tweepy.StreamListener):
         response = url
         
         if status.user.screen_name != 'predickit':
-            # if status.user.screen_name == 'VP':
-            #     if status.truncated:
-            #         response, sep, tail = status.extended_tweet['full_text'].partition('http')
-            #     else:
-            #         response, sep, tail = status.text.partition('http')
+            if status.user.screen_name == 'VP':
+                if status.truncated:
+                    response, sep, tail = status.extended_tweet['full_text'].partition('http')
+                else:
+                    response, sep, tail = status.text.partition('http')
             post_message(generalchannel, response, at_name, status.user.profile_image_url)
         else:
             post_message(testchannel, response, at_name, status.user.profile_image_url)
@@ -165,8 +165,8 @@ class StdOutListener(tweepy.StreamListener):
         quickcount = ""
         
         if status.user.screen_name == "VP":
-            lithium_data["VP1"]['count'] +=1
-            lithium_data["VP2"]['count'] +=1
+            lithium_data["VP-Fri"]['count'] +=1
+            lithium_data["VP-Tue"]['count'] +=1
         elif status.user.screen_name == "POTUS":
             lithium_data["POTUS"]['count'] +=1
         elif status.user.screen_name == "realDonaldTrump":
@@ -182,13 +182,15 @@ class StdOutListener(tweepy.StreamListener):
         
         if status.user.screen_name != 'predickit':
             post_message(generalchannel, quickcount, at_name, status.user.profile_image_url)
+            alertresponse = url + "\n" + quickcount
+            post_message(alertchannel, alertresponse, at_name, status.user.profile_image_url)
+            time.sleep(10)
             get_counts()
             if quickcount != countresponse:
                 post_message(generalchannel, "Count correction!\n"+countresponse, at_name, status.user.profile_image_url)
-            alertresponse = url + "\n" + countresponse
-            post_message(alertchannel, alertresponse, at_name, status.user.profile_image_url)
         else:
             post_message(testchannel, quickcount, at_name, status.user.profile_image_url)
+            time.sleep(5)
             get_counts()
             if quickcount != countresponse:
                 post_message(testchannel, "Count correction!\n"+countresponse, at_name, status.user.profile_image_url)
